@@ -497,6 +497,7 @@
       </div>
 
       <!-- Active Ride Tracker -->
+	  <button id="gps-toggle-btn" class="horn-btn" onclick="toggleRealGPS()" style="background: #333;">🛰️ Enable Live GPS</button>
       <div class="active-ride-box" id="active-ride">
         <div class="status-header">
           <strong id="driver-title">Dad is on the way!</strong>
@@ -692,6 +693,55 @@
           addChatMessage('driver', "We're here! Please leave a 5-star review and tidy your room.");
         }
       }, 300);
+    }
+	
+	let watchId = null;
+    let isUsingRealGPS = false;
+
+    function toggleRealGPS() {
+      if (!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser");
+        return;
+      }
+
+      isUsingRealGPS = !isUsingRealGPS;
+      const btn = document.getElementById('gps-toggle-btn');
+
+      if (isUsingRealGPS) {
+        btn.style.background = '#10b981'; // Green active state
+        btn.innerText = '📡 Live GPS Active';
+        
+        // Start watching real device position
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const currentLatLng = [lat, lng];
+
+            // If car marker exists, update its position live
+            if (carMarker) {
+              carMarker.setLatLng(currentLatLng);
+              map.panTo(currentLatLng); // Follow car on map
+            }
+          },
+          (error) => {
+            console.error("GPS Error: ", error.message);
+            alert("Unable to retrieve your location. Check device permissions.");
+          },
+          {
+            enableHighAccuracy: true,
+            maximumAge: 1000,
+            timeout: 10000
+          }
+        );
+      } else {
+        btn.style.background = '#333';
+        btn.innerText = '🛰️ Enable Live GPS';
+        if (watchId !== null) {
+          navigator.geolocation.clearWatch(watchId);
+          watchId = null;
+        }
+      }
     }
 
     function cancelRide() {
