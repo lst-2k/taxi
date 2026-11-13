@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>DadCab Premium™ | Family Ride-Hailing</title>
+  
+  <!-- Free Leaflet CSS (No API Key Required) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+
+  <style>
+    :root {
+      --bg-dark: #121212;
+      --sheet-bg: #1a1a1a;
+      --accent: #f59e0b;
+      --text-main: #ffffff;
+      --text-muted: #9ca3af;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100dvh; /* Fixes mobile browser address bar cutoff */
+      overflow: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+    }
+
+    /* Header */
+    header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background: rgba(26, 26, 26, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 16px;
+      padding-top: env(safe-area-inset-top);
+      z-index: 1001;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .badge {
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--accent);
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+
+    .horn-btn {
+      background: #333;
+      color: #fff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    /* Map Container */
+    #map {
+      width: 100%;
+      height: 100dvh;
+      z-index: 1;
+    }
+
+    .emoji-marker {
+      font-size: 24px;
+      text-align: center;
+      line-height: 32px;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    }
+
+    .map-hint {
+      position: absolute;
+      top: 72px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      z-index: 1000;
+      pointer-events: none;
+      white-space: nowrap;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Slide-Up Bottom Sheet Controls */
+    .bottom-sheet {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--sheet-bg);
+      border-top-left-radius: 24px;
+      border-top-right-radius: 24px;
+      padding: 0 20px calc(24px + env(safe-area-inset-bottom));
+      box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
+      z-index: 1002;
+      transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+      max-height: 78dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .bottom-sheet.collapsed {
+      transform: translateY(calc(100% - 90px));
+    }
+
+    .drag-handle-area {
+      width: 100%;
+      padding: 12px 0 16px 0;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .drag-handle {
+      width: 40px;
+      height: 5px;
+      background: #555;
+      border-radius: 3px;
+      margin: 0 auto;
+    }
+
+    .sheet-content {
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding-bottom: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .section-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .input-group {
+      background: #222;
+      border-radius: 14px;
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .input-row:last-child {
+      border-bottom: none;
+    }
+
+    .input-row input, .input-row select {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 0.95rem;
+      width: 100%;
+      outline: none;
+    }
+
+    .input-row select option {
+      background: #222;
+      color: #fff;
+    }
+
+    .presets {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 6px 0 2px;
+      scrollbar-width: none;
+    }
+
+    .presets::-webkit-scrollbar {
+      display: none;
+    }
+
+    .preset-chip {
+      background: #2d2d2d;
+      color: #ddd;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      white-space: nowrap;
+      border: 1px solid rgba(255,255,255,0.05);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .preset-chip:active {
+      background: var(--accent);
+      color: #111;
+    }
+
+    .tiers-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tier-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #222;
+      border: 1.5px solid rgba(255,255,255,0.08);
+      padding: 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: all 0.2s ease;
+    }
+
+    .tier-card.selected {
+      border-color: var(--accent);
+      background: rgba(245, 158, 11, 0.08);
+    }
+
+    .tier-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tier-icon {
+      font-size: 24px;
+    }
+
+    .tier-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .tier-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .tier-price {
+      text-align: right;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--accent);
+    }
+
+    .cta-btn {
+      width: 100%;
+      min-height: 52px;
+      background: var(--accent);
+      color: #111;
+      font-weight: 700;
+      font-size: 1rem;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      touch-action: manipulation;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .cta-btn.cancel {
+      background: #ef4444;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    }
+
+    /* Active Ride Box */
+    .active-ride-box {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .status-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .status-badge {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: #333;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.3s linear;
+    }
+
+    .chat-box {
+      background: #151515;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+      height: 110px;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.85rem;
+    }
+
+    .chat-msg {
+      padding: 6px 10px;
+      border-radius: 8px;
+      max-width: 85%;
+      line-height: 1.3;
+    }
+
+    .chat-msg.driver {
+      background: #2a2a2a;
+      align-self: flex-start;
+      color: #e5e7eb;
+    }
+
+    .chat-msg.user {
+      background: var(--accent);
+      color: #111;
+      align-self: flex-end;
+      font-weight: 500;
+    }
+
+    .chat-input-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .chat-input-row input {
+      flex: 1;
+      background: #222;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #fff;
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .chat-input-row button {
+      background: #333;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0 16px;
+      font-weight: 600;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span>🚕 DadCab</span>
+      <span class="badge">Family VIP</span>
+    </div>
+    <button class="horn-btn" onclick="playHorn()">📢 Honk Horn</button>
+  </header>
+
+  <div class="map-hint">📍 Drag pins or tap map to set route</div>
+  <div id="map"></div>
+
+  <!-- Slide-Up Bottom Sheet Control Panel -->
+  <div id="sheet" class="bottom-sheet">
+    <div class="drag-handle-area" id="dragHandleArea">
+      <div class="drag-handle"></div>
+    </div>
+
+    <div class="sheet-content">
+      <!-- Booking Form -->
+      <div id="booking-form">
+        <div class="section-title">1. Where to?</div>
+        <div class="input-group">
+          <div class="input-row">
+            <span>🟢</span>
+            <input type="text" id="pickup-input" value="Home Base (Front Door)" placeholder="Pickup location" />
+          </div>
+          <div class="input-row">
+            <span>🏁</span>
+            <input type="text" id="dropoff-input" value="Local Fish & Chip Shop" placeholder="Destination" />
+          </div>
+          <div class="presets">
+            <span class="preset-chip" onclick="setPreset('School Gates', [52.6835, -1.9180])">🏫 School Run</span>
+            <span class="preset-chip" onclick="setPreset('Football Practice', [52.6790, -1.9050])">⚽ Training</span>
+            <span class="preset-chip" onclick="setPreset('Supermarket', [52.6755, -1.9250])">🛒 Snacks Run</span>
+            <span class="preset-chip" onclick="setPreset('Nanna\'s House', [52.6880, -1.9100])">👵 Nanna's</span>
+          </div>
+        </div>
+
+        <!-- Pickup Time -->
+        <div class="section-title" style="margin-top: 14px;">2. Pickup Time</div>
+        <div class="input-row" style="background:#222; border-radius:14px; padding:4px 10px; border:1px solid rgba(255,255,255,0.08);">
+          <span>⏰</span>
+          <select id="time-select">
+            <option value="ASAP (Shoes On!)">ASAP (Put your shoes on!)</option>
+            <option value="In 5 Mins">In 5 Minutes</option>
+            <option value="After Tea">Right After Tea</option>
+            <option value="When Dad Finishes Coffee">When Dad Finishes His Coffee</option>
+            <option value="When Mom Finds Her Keys">When Mom Finds Her Keys</option>
+          </select>
+        </div>
+
+        <!-- Fleet Selection -->
+        <div class="section-title" style="margin-top: 14px;">3. Choose Your Chauffeur</div>
+        <div class="tiers-list">
+          <div class="tier-card selected" onclick="selectTier(this, 'Dad\'s Classic', 'Dad', '80s Rock & Dad Jokes included')">
+            <div class="tier-left">
+              <div class="tier-icon">🚙</div>
+              <div>
+                <div class="tier-name">Dad's Classic</div>
+                <div class="tier-desc">80s Rock & Dad Jokes included</div>
+              </div>
+            </div>
+            <div class="tier-price">FREE<br><span style="font-size:0.7rem;color:var(--text-muted);">(1 Eye Roll)</span></div>
+          </div>
+
+          <div class="tier-card" onclick="selectTier(this, 'Mom\'s Express', 'Mom', 'Fastest route + Life Advice')">
+            <div class="tier-left">
+              <div class="tier-icon">🚐</div>
+              <div>
+                <div class="tier-name">Mom's Express</div>
+                <div class="tier-desc">Fastest route + Life Advice</div>
+              </div>
+            </div>
+            <div class="tier-price">1 Chore<br><span style="font-size:0.7rem;color:var(--text-muted);">(Dishwasher)</span></div>
+          </div>
+
+          <div class="tier-card" onclick="selectTier(this, 'Sibling Shuttle', 'Sibling', 'Loud music, zero patience')">
+            <div class="tier-left">
+              <div class="tier-icon">🚗</div>
+              <div>
+                <div class="tier-name">Sibling Shuttle</div>
+                <div class="tier-desc">Loud music, zero patience</div>
+              </div>
+            </div>
+            <div class="tier-price">Snack Tax<br><span style="font-size:0.7rem;color:var(--text-muted);">(50% of Fries)</span></div>
+          </div>
+        </div>
+
+        <button class="cta-btn" style="margin-top: 16px;" onclick="requestRide()">Request Family Ride</button>
+      </div>
+
+      <!-- Active Ride Tracker -->
+      <div class="active-ride-box" id="active-ride">
+        <div class="status-header">
+          <strong id="driver-title">Dad is on the way!</strong>
+          <span class="status-badge" id="ride-status-text">Dispatching...</span>
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-muted);" id="ride-meta">
+          Pickup: ASAP • Fare: Free
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="ride-progress"></div>
+        </div>
+
+        <!-- Live Driver Chat -->
+        <div class="section-title" style="margin-top: 4px;">Driver Comms</div>
+        <div class="chat-box" id="chat-box"></div>
+        <div class="chat-input-row">
+          <input type="text" id="chat-input" placeholder="Message driver (e.g. 'Can we get ice cream?')" onkeypress="if(event.key==='Enter') sendChat()" />
+          <button onclick="sendChat()">Send</button>
+        </div>
+
+        <button class="cta-btn cancel" onclick="cancelRide()">Cancel / End Ride</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Free Leaflet JS (No API Key Required) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <script>
+    // 1. Initialize Free OpenStreetMap via Leaflet (Default centered near Burntwood, UK)
+    const startCoords = [52.6815, -1.9150];
+    const endCoords = [52.6775, -1.9210];
+
+    const map = L.map('map', { zoomControl: false }).setView(startCoords, 15);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // 100% Free OpenStreetMap Tile Layer (No API Key Needed)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+	  maxZoom: 19,
+	  attribution: '&copy; OpenStreetMap & CARTO'
+	}).addTo(map);
+
+    // Custom Emoji Markers
+    const createEmojiIcon = (emoji) => L.divIcon({
+      html: `<div class="emoji-marker">${emoji}</div>`,
+      className: '',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
+    });
+
+    const pickupMarker = L.marker(startCoords, { draggable: true, icon: createEmojiIcon('🟢') }).addTo(map);
+    const dropoffMarker = L.marker(endCoords, { draggable: true, icon: createEmojiIcon('🏁') }).addTo(map);
+    let carMarker = null;
+
+    // Route Line
+    let routeLine = L.polyline([startCoords, endCoords], {
+      color: '#f59e0b',
+      weight: 4,
+      dashArray: '8, 8'
+    }).addTo(map);
+
+    function updateRouteLine() {
+      const p1 = pickupMarker.getLatLng();
+      const p2 = dropoffMarker.getLatLng();
+      routeLine.setLatLngs([p1, p2]);
+    }
+
+    pickupMarker.on('drag', () => {
+      updateRouteLine();
+      document.getElementById('pickup-input').value = `Pinned Pickup (${pickupMarker.getLatLng().lat.toFixed(4)}, ${pickupMarker.getLatLng().lng.toFixed(4)})`;
+    });
+
+    dropoffMarker.on('drag', () => {
+      updateRouteLine();
+      document.getElementById('dropoff-input').value = `Pinned Dropoff (${dropoffMarker.getLatLng().lat.toFixed(4)}, ${dropoffMarker.getLatLng().lng.toFixed(4)})`;
+    });
+
+    // Click map to move destination
+    map.on('click', (e) => {
+      if (rideInterval) return;
+      dropoffMarker.setLatLng(e.latlng);
+      updateRouteLine();
+      document.getElementById('dropoff-input').value = `Custom Map Pin (${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)})`;
+    });
+
+    function setPreset(name, coords) {
+      document.getElementById('dropoff-input').value = name;
+      dropoffMarker.setLatLng(coords);
+      updateRouteLine();
+      map.fitBounds(L.latLngBounds([pickupMarker.getLatLng(), dropoffMarker.getLatLng()]), { padding: [50, 50] });
+      // Collapse sheet slightly so user can view preset on map
+      document.getElementById('sheet').classList.add('collapsed');
+    }
+
+    // 2. Bottom Sheet Collapse / Expand Swipe & Tap Handlers
+    const sheet = document.getElementById('sheet');
+    const dragHandleArea = document.getElementById('dragHandleArea');
+    let startY = 0;
+    let isDragging = false;
+
+    dragHandleArea.addEventListener('click', () => {
+      sheet.classList.toggle('collapsed');
+    });
+
+    dragHandleArea.addEventListener('touchstart', (e) => {
+      startY = e.touches[0].clientY;
+      isDragging = true;
+    }, { passive: true });
+
+    dragHandleArea.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      const currentY = e.touches[0].clientY;
+      const diff = currentY - startY;
+      if (diff > 40) {
+        sheet.classList.add('collapsed');
+        isDragging = false;
+      } else if (diff < -40) {
+        sheet.classList.remove('collapsed');
+        isDragging = false;
+      }
+    }, { passive: true });
+
+    dragHandleArea.addEventListener('touchend', () => {
+      isDragging = false;
+    });
+
+    // 3. Fleet Selection
+    let selectedTier = "Dad's Classic";
+    let selectedDriver = "Dad";
+
+    function selectTier(el, tierName, driverName) {
+      document.querySelectorAll('.tier-card').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+      selectedTier = tierName;
+      selectedDriver = driverName;
+    }
+
+    // 4. Ride Simulation & Live GPS Movement
+    let rideInterval = null;
+
+    function requestRide() {
+      playHorn();
+      const pickupText = document.getElementById('pickup-input').value;
+      const dropoffText = document.getElementById('dropoff-input').value;
+      const timeText = document.getElementById('time-select').value;
+
+      document.getElementById('booking-form').style.display = 'none';
+      document.getElementById('active-ride').style.display = 'flex';
+      document.getElementById('driver-title').innerText = `${selectedDriver} (${selectedTier})`;
+      document.getElementById('ride-meta').innerText = `${pickupText} ➔ ${dropoffText} • ${timeText}`;
+
+      const chatBox = document.getElementById('chat-box');
+      chatBox.innerHTML = `<div class="chat-msg driver"><strong>${selectedDriver}:</strong> Engine started. Be outside in 30 seconds or I'm leaving without you!</div>`;
+
+      const p1 = pickupMarker.getLatLng();
+      const p2 = dropoffMarker.getLatLng();
+      map.fitBounds(L.latLngBounds([p1, p2]), { padding: [60, 60] });
+      sheet.classList.add('collapsed'); // Tuck sheet down to watch car move
+
+      if (carMarker) map.removeLayer(carMarker);
+      carMarker = L.marker(p1, { icon: createEmojiIcon('🚕') }).addTo(map);
+
+      let progress = 0;
+      const statusEl = document.getElementById('ride-status-text');
+      const barEl = document.getElementById('ride-progress');
+
+      const statuses = [
+        "Looking for car keys...",
+        "Adjusting mirrors & radio...",
+        "En route (No backseat driving!)",
+        "Approaching destination...",
+        "Arrived! Don't slam the door!"
+      ];
+
+      rideInterval = setInterval(() => {
+        progress += 2;
+        barEl.style.width = `${progress}%`;
+
+        const lat = p1.lat + (p2.lat - p1.lat) * (progress / 100);
+        const lng = p1.lng + (p2.lng - p1.lng) * (progress / 100);
+        carMarker.setLatLng([lat, lng]);
+
+        if (progress < 20) statusEl.innerText = statuses[0];
+        else if (progress < 40) statusEl.innerText = statuses[1];
+        else if (progress < 75) statusEl.innerText = statuses[2];
+        else if (progress < 100) statusEl.innerText = statuses[3];
+        else {
+          statusEl.innerText = statuses[4];
+          clearInterval(rideInterval);
+          rideInterval = null;
+          playHorn();
+          sheet.classList.remove('collapsed'); // Pop open sheet upon arrival
+          addChatMessage('driver', "We're here! Please leave a 5-star review and tidy your room.");
+        }
+      }, 300);
+    }
+
+    function cancelRide() {
+      if (rideInterval) clearInterval(rideInterval);
+      rideInterval = null;
+      if (carMarker) map.removeLayer(carMarker);
+      document.getElementById('active-ride').style.display = 'none';
+      document.getElementById('booking-form').style.display = 'block';
+      sheet.classList.remove('collapsed');
+    }
+
+    // 5. Driver Chat Simulator
+    function sendChat() {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      addChatMessage('user', text);
+      input.value = '';
+
+      setTimeout(() => {
+        const lower = text.toLowerCase();
+        let reply = "Keep your seatbelt fastened and no fighting in the back!";
+        
+        if (lower.includes('ice cream') || lower.includes('mcdonald') || lower.includes('food')) {
+          reply = selectedDriver === 'Dad' 
+            ? "We have food at home!" 
+            : "Only if you eat all your dinner tonight.";
+        } else if (lower.includes('where') || lower.includes('long')) {
+          reply = "If you ask 'Are we there yet?' one more time, I'm turning this car around.";
+        } else if (lower.includes('music') || lower.includes('aux')) {
+          reply = "Driver picks the music, passenger shuts their cakehole.";
+        } else if (lower.includes('ready') || lower.includes('outside')) {
+          reply = "Coming! Just putting my shoes on.";
+        }
+
+        addChatMessage('driver', reply);
+      }, 700);
+    }
+
+    function addChatMessage(sender, text) {
+      const chatBox = document.getElementById('chat-box');
+      const div = document.createElement('div');
+      div.className = `chat-msg ${sender}`;
+      div.innerHTML = sender === 'driver' ? `<strong>${selectedDriver}:</strong> ${text}` : text;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // 6. Web Audio Car Horn
+    function playHorn() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = ctx.currentTime;
+        
+        [340, 425].forEach(freq => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(freq, now);
+          
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+          
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.35);
+        });
+      } catch (e) {
+        console.log("Audio blocked until user interaction");
+      }
+    }
+  </script>
+</body>
+</html>
