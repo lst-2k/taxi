@@ -398,6 +398,9 @@
       cursor: pointer;
       touch-action: manipulation;
     }
+	.leaflet-layer img {
+		filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+	  }
   </style>
 </head>
 <body>
@@ -530,11 +533,11 @@
     const map = L.map('map', { zoomControl: false }).setView(startCoords, 15);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // 100% Free OpenStreetMap Tile Layer (No API Key Needed)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-	  maxZoom: 19,
-	  attribution: '&copy; OpenStreetMap & CARTO'
-	}).addTo(map);
+    // 100% Free Standard OpenStreetMap Tiles (No API Key or Watermarks)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
 
     // Custom Emoji Markers
     const createEmojiIcon = (emoji) => L.divIcon({
